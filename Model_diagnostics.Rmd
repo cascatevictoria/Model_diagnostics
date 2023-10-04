@@ -1,0 +1,393 @@
+---
+title: "Model diagnostics: Good classmates"
+author: "Victoria Bolotova"
+date: "05 03 2022"
+output: 
+    html_document:
+      theme: cosmo
+      code_folding: show
+      toc: true
+      toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# Data preprocessing
+
+```{r}
+library(dplyr)
+library(foreign)
+library(haven)
+
+initial_df <- read_sav("/Users/victoriabolotova/HSE/HSE 21-22/data_analysis_3rd_year/Practice_OLS/data.sav") 
+
+df <- initial_df %>% haven::as_factor()
+```
+
+Let's create two new variables:
+
+```{r}
+# It is the dependent variable
+df[,c(65:67)] = sapply(df[,c(65:67)], as.numeric)
+df$good_classmates <- rowMeans(df[,c(65:67)], na.rm=TRUE)
+
+# It is an independent variable
+df[,c(51:54)] = sapply(df[,c(51:54)], as.numeric)
+df$good_freinds = rowMeans(df[,c(51:54)], na.rm = T)
+```
+
+Let's select only variables that will be used in the liner model into another dataset. 
+
+```{r}
+df_model <- df %>% 
+  select(good_classmates, good_freinds, AGE, sex, m96, bulliedothers)
+```
+
+Let's delete all missing values:
+
+```{r}
+df_model <- na.omit(df_model)
+nrow(df_model)
+```
+
+# Descriptive statistics
+
+Now I am going to explore the most basic information about continuous features. 
+
+```{r}
+library(modelsummary)
+datasummary_skim(df_model, sparse_header=FALSE)
+```
+
+To get an overview of categorical variables:
+
+```{r}
+datasummary_skim(df_model, type="categorical")
+```
+
+
+## Good classmates	
+
+This variable was created by taking the means of the following variables:
+
+* `studtogether` - The students in my class(es) enjoy being together 
+* `studhelpful`-  Most of the students in my class(es) are kind and helpful
+* `studaccept` -  Other students accept me as I am
+
+where 1 means strongly agree with the statement, meanwhile 5 means strongly disagree.
+
+```{r}
+library(ggplot2)
+ggplot(df_model, aes(good_classmates)) +
+  geom_histogram(fill = "#fcbf49", bins = 10) +
+  labs(title = "Distribution of the variable good classmates",
+       x = "Number of good classmates", 
+       y = "") + 
+  scale_fill_manual("e9c46a") +
+  theme_classic()
+```
+
+## Good friends
+
+This variable was created by taking the means of the following variables:
+
+* `friendhelp` - My friends really try to help me
+* `friendcounton` - Can count on friends
+* `friendshare` - I have friends with whom I can share my joys and sorrows
+* `friendtalk` - I can talk about my problems with my friends
+
+where 1 means very strongly disagree, meanwhile 7 means very strongly agree.
+
+```{r}
+library(ggplot2)
+ggplot(df_model, aes(good_freinds)) +
+  geom_histogram(fill = "#fcbf49", bins = 10) +
+  labs(title = "Distribution of the variable good friends",
+       x = "Good friends", 
+       y = "") + 
+  scale_fill_manual("e9c46a") +
+  theme_classic()
+```
+
+## Age
+
+```{r}
+library(ggplot2)
+ggplot(df_model, aes(AGE)) +
+  geom_histogram(fill = "#b8e0d2", bins = 10) +
+  labs(title = "Age of respondents",
+       x = "Age", 
+       y = "") +
+  theme_classic()
+```
+
+
+## Sex
+
+```{r}
+sex_barplot  <- df_model %>% 
+  group_by(sex) %>% 
+ dplyr::summarize(count = n()) %>%  
+ mutate(percentage = count/sum(count)) 
+
+ggplot(sex_barplot, aes(x = sex, y = percentage, fill = sex)) + 
+  geom_bar(stat='identity') + 
+  geom_text(aes(label=scales::percent(percentage)), position = position_stack(vjust = .5)) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x="Gender", 
+       y="",
+       title="Gender distribution in data") +
+  scale_fill_manual("Gender", values = c('#c1d3fe', '#ffb5a7')) + 
+  theme_classic() + 
+  theme(legend.position="none")
+```
+
+
+## Meet friends
+
+* "How often do you meet your friends outside school time after 8 o’clock in the evening?"
+
+```{r fig.width=10, fig.height= 6}
+meet_barplot  <- df_model %>% 
+  group_by(m96) %>% 
+ dplyr::summarize(count = n()) %>%  
+ mutate(percentage = count/sum(count)) 
+
+ggplot(meet_barplot, aes(x = m96, y = percentage, fill = m96)) + 
+  geom_bar(stat='identity') + 
+  geom_text(aes(label=scales::percent(percentage)), position = position_stack(vjust = .5)) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x="Frequency", 
+       y="",
+       title="Distrubution of respondents' answers about meeting with friends") + 
+  scale_fill_manual("Meetings", values = c('#ee6055', '#ff9b85', '#ffd97d', '#b6e19e')) + 
+  theme_classic() + 
+  theme(legend.position="none")
+```
+
+## Bullied others
+
+* How often have you taken part in bullying another student(s) at school in the past couple of months?
+
+```{r}
+bullied_barplot  <- df_model %>% 
+  group_by(bulliedothers) %>% 
+ dplyr::summarize(count = n()) %>%  
+ mutate(percentage = count/sum(count)) 
+
+ggplot(bullied_barplot, aes(x = bulliedothers, y = percentage, fill = bulliedothers)) + 
+  geom_bar(stat='identity') + 
+  geom_text(aes(label=scales::percent(percentage)), position = position_stack(vjust = .5)) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x="Frequency", 
+       y="",
+       title="Distrubution of respondents' answers about bullying others") + 
+  scale_fill_manual("Meetings", values = c('#b6e19e', '#eff8cd', '#ffd97d', '#ff9b85', '#ee6055')) + 
+  theme_classic() + 
+  theme(legend.position="none")
+```
+
+# Model and its interpretation 
+
+```{r}
+library(sjPlot)
+
+labs_1 <- c("Constant",
+  "Gender (Girl)",
+  "Age",
+  "Meet friends outside school time after 8pm (less than weekly)", 
+  "Meet friends outside school time after 8pm (weekly)",
+  "Meet friends outside school time after 8pm (daily)",
+  "Bullied others past 2 months (Once or twice)", 
+  "Bullied others (2-3 times per month)",
+  "Bullied others past 2 months (Once/week)",
+  "Bullied others past 2 months: Several times/week",
+  "Good freinds",
+  "Bullied others (Once or twice)*Good freinds",
+  "Bullied others (2-3 times per month)*Good freinds",
+  "Bullied others (Once/week)*Good freinds", 
+  "Bullied others (Several times/week)*Good freinds")
+
+
+model_1 <- lm(good_classmates ~ sex +
+                AGE + m96 +
+                bulliedothers * 
+                good_freinds, df_model)
+
+library(sjPlot)
+tab_model(model_1, pred.labels = labs_1, dv.labels = "Good classmates")
+```
+
+- p-value & Adjusted R-squared
+
+  - The model fits the data significantly, as F-statistics shows the p-value (2.2e-16) much smaller than 0.05. It means that changes in some explanatory variables (significant ones) are associated with changes in students' estimations of how good their classmates are in different aspects at the population level across countries that were included in the survey. 
+  
+  - Adjusted R-squared equals 0.1, it means that 10% of variance in students' estimations of how good their classmates are in different aspects can be explained by the model. Thus, I can conclude that the explanatory power is not very good, as only 10% of the variation is completely explained by the model. 
+  
+**Interpretation of the unstandardized coefficients**
+
+* On average for girls the predicted estimation of how good their classmates is 0.14 lower (=worse) **(lower because 1 in good_classmates means strongly agree with the statement)**, compared to boys, holding everything else constant. 
+
+* On average every one unit increase in adolescents' age leads to 0.05 decrease in adolescents' estimation of how good their classmates are, holding everything else constant. 
+
+- Variable `m96`, a factor
+  - The reference category for a variable `m96` (“How often do you meet your friends outside school time after 8 o’clock in the evening?”) is *hardly ever or never*
+  - On average, for adolescents who meet with their friends outside school time after 8 o’clock in the evening *less than weekly* the predicted estimation of how good their classmates is 0.06 higher (= better), compared to adolescents who meet with their friends *hardly ever or never*, holding everything else constant. 
+  - On average, for adolescents who meet with their friends outside school time after 8 o’clock in the evening *weekly* the predicted estimation of how good their classmates is 0.09 higher (= better), compared to adolescents who meet with their friends *hardly ever or never*, holding everything else constant. 
+  - On average, for adolescents who meet with their friends outside school time after 8 o’clock in the evening *daily* the predicted estimation of how good their classmates is 0.1 higher (= better), compared to adolescents who meet with their friends *hardly ever or never*, holding everything else constant.
+  
+- Variable `bulliedothers`, a factor. All categories is this variable do not differ from reference category `haven't` at predicting pupils' estimation of how good their classmates are, except for the category `several times/week` with p-value 0.06. Let's interpret the difference between this category and reference one:
+  - On average, for adolescents who have taken part in bullying another student(s) at school *several times/week* the predicted estimation of how good their classmates is 0.2 lower (= worse), compared to adolescents who haven't taken part in bullying another student(s) at school, holding everything else constant.
+
+* Every one unit increase (from 1 - “Very strongly disagree” to 7 - “Very strongly agree”) in adolescents’ estimation of how good their friends are leads to 0.15 increase in adolescents' estimation of how good their classmates are (from 1 - very good classmates to 5 - very bad classmates), holding everything else constant. 
+
+- Interpretation of the interaction effect between `good_friends` and `bulliedothers`:
+  - beta (= 0.03) for a category `bullied others once or twice` shows how the beta for the `bullied others once or twice` changes when the variable `good friends` changes by 1 (from 1 - “Very strongly disagree” to 7 - “Very strongly agree”). The 1 unit increase in estimation of how good adolescents' friends are (from 1 - very bad friends to 7 - very good friends) leads to 0.03 increase in the effect of bullying others once or twice. That means that for children who have very good friends the association between bullying others once or twice and estimation of how good their classmates is much smaller (from 1 - very good classmates to 5 - very bad classmates).
+  - The 1 unit increase in estimation of how good adolescents' friends are (from 1 - very bad friends to 7 - very good friends) leads to 0.04 increase in the effect of bullying others 2-3 times per month. 
+  - The 1 unit increase in estimation of how good adolescents' friends are (from 1 - very bad friends to 7 - very good friends) leads to 0.05 increase in the effect of bullying others once/week.
+  - The interaction between the category `bullied others several times/week` and `good friends` is not significant. 
+  
+  
+```{r}
+library(sjPlot)
+library(ggplot2)
+plot_model(model_1, type="int", title = "Prediction of estimation of how good the classmates are with interaction effect", colors = "Set1") + ylab("Good classmates") + 
+  theme_classic()
+```
+
+
+* for good classmates - 1 means very good classmates, meanwhile 5 means very bad classmates.
+* for good friends - 1 means very bad friends, meanwhile 7 means very good friends.
+
+- Interpretation of the interaction effect:
+  - For adolescents who haven't taken part in bullying others the difference between those who have very good friends and for those who have very bad friends at predicting their estimation of how good their classmates are is the biggest. Most positive estimation of the classmates is among those who haven't bullied others and who have very good friends. In the group of adolescents who bullied others once or twice in past 2 months the difference between those who have very good friends and who have very bad friends is smaller, compared to the difference between those who haven't taken part in bullying others. The difference is smaller for those who bullied others 2-3 times per month and even much smaller among those adolescents who who bullied others once per week. But the difference in estimation of classmates among adolescents who bullied others several times per week is bigger because those who bullied others several times per week and have very bad friends have the worst estimation of how good their classmates are. 
+
+
+# Model diagnostics
+
+## Linear relationship
+
+### Visualization
+
+```{r}
+ggplot(df_model, aes(good_freinds, good_classmates)) +
+  geom_point(color = "skyblue") + 
+  geom_smooth(method = "lm", se = FALSE, color = "skyblue") +
+  labs(title = "The relationship between good classmates and good friends", 
+       x = "Good friends", 
+       y = "Good classmates") +
+  theme_classic()
+```
+
+Well, the relationship between these variables is not really linear.
+
+```{r}
+ggplot(df_model, aes(AGE, good_classmates)) +
+  geom_point(color = "skyblue") + 
+  geom_smooth(method = "lm", se = FALSE, color = "skyblue") +
+  labs(title = "The relationship between good classmates and age", 
+       x = "Age", 
+       y = "Good classmates") +
+  theme_classic()
+```
+
+The same situation with age and good classmates.
+
+### Independent variable transformation
+
+Let’s try Box-Tidwell test to check whether the relationship between continuous predictors and outcome variable is linear.
+
+```{r}
+library(car)
+boxTidwell(good_classmates ~ AGE + good_freinds, data = df_model) # shows the power to be raised to 
+# lambda close 0 - log
+# lambda close 2 - quadratic term, others - do not transfrom
+```
+
+* Although significant p-value, age and good friends should not be transformed somehow as MLE of lambda is too high in both cases, so there is no sense to do smth. 
+
+### Dependent variable transformation
+
+```{r}
+library(MASS)
+boxcox(model_1) # shows the power to be raised to 
+# lambda close 0 - log
+# lambda close 1 - no transformations
+```
+
+As I can see from the graph, lambda is close to 0, which means that dependent variable should be transformed to log-scale. 
+
+## Residual normality
+
+### Q-Q plot
+
+```{r}
+qqPlot(model_1, labels = row.names(good_classmates), main = "Q-Q plot") 
+```
+
+* As we see from the plot, many observations do not follow blue line and are out of its confidence intervals, especially observations above 2 SD. So, model works poorly for observations above 2 SD. 
+
+### Density plot 
+
+```{r}
+ggplot(df_model, aes(residuals(model_1))) +
+  geom_density(fill = "#e5e5e5") + 
+labs(x = "Residuals",
+     y = " " ,
+     title = "Distribution of residuals") +
+   theme_classic()
+```
+
+The distribution of residuals is skewed to the right as there is this heavy right tail.
+
+I can conclude that residuals are not normally distributed.
+
+## Multicollinearity
+
+```{r}
+vif(model_1)
+```
+As we can see from the result, there is no multicollinearity problem for the model.
+
+## Homoscedasticity
+
+```{r}
+par(mfrow = c(1, 2))
+plot(fitted.values(model_1), rstudent(model_1))
+abline(h=0, lty=2)
+spreadLevelPlot(model_1) #blue line should be horizontal
+```
+
+Blue line is approximately horizontal, but let's run the test.
+
+```{r}
+ncvTest(model_1)
+```
+
+According to p-value, the model has non-constant error variance, which is really a problem.
+
+To sum up, the model has the following problems:
+
+* residuals are not normally distributed 
+* non-constant error variance
+* dependent variable should be log-transformed
+
+# Fix the model 
+
+Let's try to log-transform the dependent variable
+
+```{r}
+df_model$log_good_classmates <- log(df_model$good_classmates)
+model_log <- lm(log_good_classmates ~ sex +
+                AGE + m96 +
+                bulliedothers * 
+                good_freinds, df_model)
+
+tab_model(model_log, pred.labels = labs_1, dv.labels = "Log of good classmates")
+```
+
+* Well, Adjusted R-squared did not improve and became even worse, so probably we should not log transform dependent variable.
+
+That's all for this project :)
